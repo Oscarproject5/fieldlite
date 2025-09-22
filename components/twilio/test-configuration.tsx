@@ -17,7 +17,9 @@ import {
   PhoneCall,
   PhoneOutgoing,
   PhoneIncoming,
-  Send
+  Send,
+  Webhook,
+  Copy
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -31,11 +33,12 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
   const [testMessage, setTestMessage] = useState('Hello! This is a test message from FieldLite CRM.')
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{
-    type: 'call' | 'sms'
+    type: 'call' | 'sms' | 'webhook'
     success: boolean
     message: string
     details?: any
   } | null>(null)
+  const [webhookUrl, setWebhookUrl] = useState('')
 
   const supabase = createClient()
 
@@ -87,6 +90,89 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
         type: 'call',
         success: false,
         message: error.message || 'An error occurred while making the test call'
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const testWebhook = async () => {
+    setTesting(true)
+    setTestResult(null)
+
+    try {
+      // Get the current tenant ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setTestResult({
+          type: 'webhook',
+          success: false,
+          message: 'Not authenticated'
+        })
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.tenant_id) {
+        setTestResult({
+          type: 'webhook',
+          success: false,
+          message: 'No tenant found'
+        })
+        return
+      }
+
+      // Generate webhook URLs for both local and production
+      const isProduction = window.location.hostname !== 'localhost'
+      const baseUrl = isProduction
+        ? 'https://fieldlite.vercel.app' // Your Vercel URL
+        : window.location.origin
+
+      const voiceWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/voice`
+      const statusWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/status`
+
+      setWebhookUrl(voiceWebhookUrl)
+
+      // Test the webhook endpoint
+      const response = await fetch('/api/twilio/webhook/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: profile.tenant_id,
+          testType: 'voice'
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setTestResult({
+          type: 'webhook',
+          success: true,
+          message: 'Webhook endpoints are configured and ready!',
+          details: {
+            voiceWebhook: voiceWebhookUrl,
+            statusWebhook: statusWebhookUrl,
+            tenantId: profile.tenant_id
+          }
+        })
+      } else {
+        setTestResult({
+          type: 'webhook',
+          success: false,
+          message: data.error || 'Failed to test webhook'
+        })
+      }
+    } catch (error: any) {
+      setTestResult({
+        type: 'webhook',
+        success: false,
+        message: error.message || 'An error occurred while testing webhooks'
       })
     } finally {
       setTesting(false)
@@ -195,7 +281,7 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
           </div>
 
           <Tabs defaultValue="call" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="call" disabled={testing}>
                 <PhoneCall className="mr-2 h-4 w-4" />
                 Test Call
@@ -203,6 +289,10 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
               <TabsTrigger value="sms" disabled={testing}>
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Test SMS
+              </TabsTrigger>
+              <TabsTrigger value="webhook" disabled={testing}>
+                <Webhook className="mr-2 h-4 w-4" />
+                Webhook
               </TabsTrigger>
             </TabsList>
 
@@ -276,6 +366,76 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="webhook" className="space-y-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Webhook className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="font-medium">Webhook Configuration Test</p>
+                        <p className="text-sm text-gray-500">
+                          Verify your webhook endpoints are properly configured
+                        </p>
+                      </div>
+                    </div>
+
+                    {webhookUrl && (
+                      <div className="p-3 bg-gray-50 rounded-md space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-gray-600">Voice Webhook URL:</p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2"
+                            onClick={() => {
+                              navigator.clipboard.writeText(webhookUrl);
+                              setTestResult({
+                                type: 'webhook',
+                                success: true,
+                                message: 'Webhook URL copied to clipboard!'
+                              });
+                              setTimeout(() => setTestResult(null), 3000);
+                            }}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-xs font-mono break-all">{webhookUrl}</p>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={testWebhook}
+                      disabled={testing}
+                      className="w-full"
+                    >
+                      {testing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Testing Webhooks...
+                        </>
+                      ) : (
+                        <>
+                          <Webhook className="mr-2 h-4 w-4" />
+                          Test Webhook Configuration
+                        </>
+                      )}
+                    </Button>
+
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        This will verify that your webhook endpoints are accessible and can receive Twilio callbacks.
+                        Make sure your Twilio phone number is configured to use these webhook URLs.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
 
           {testResult && (
@@ -286,7 +446,7 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
                 <XCircle className="h-4 w-4 text-red-600" />
               )}
               <AlertTitle className={testResult.success ? 'text-green-900' : 'text-red-900'}>
-                {testResult.type === 'call' ? 'Call Test' : 'SMS Test'} {testResult.success ? 'Successful' : 'Failed'}
+                {testResult.type === 'call' ? 'Call Test' : testResult.type === 'sms' ? 'SMS Test' : 'Webhook Test'} {testResult.success ? 'Successful' : 'Failed'}
               </AlertTitle>
               <AlertDescription className={testResult.success ? 'text-green-700' : 'text-red-700'}>
                 {testResult.message}
@@ -297,6 +457,22 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
                     )}
                     {testResult.type === 'sms' && testResult.details.messageSid && (
                       <p>Message SID: {testResult.details.messageSid}</p>
+                    )}
+                    {testResult.type === 'webhook' && testResult.details && (
+                      <>
+                        {testResult.details.voiceWebhook && (
+                          <div className="mt-2">
+                            <p className="font-medium">Voice Webhook:</p>
+                            <p className="font-mono text-xs break-all">{testResult.details.voiceWebhook}</p>
+                          </div>
+                        )}
+                        {testResult.details.statusWebhook && (
+                          <div className="mt-1">
+                            <p className="font-medium">Status Webhook:</p>
+                            <p className="font-mono text-xs break-all">{testResult.details.statusWebhook}</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

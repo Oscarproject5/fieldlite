@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TwilioService } from '@/lib/twilio/service';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
@@ -51,22 +50,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Test the credentials
-    const twilioService = new TwilioService(profile.tenant_id);
-    const validationResult = await twilioService.validateCredentials(accountSid, authToken);
+    // Test credentials using fetch instead of Twilio SDK
+    try {
+      const authString = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
-    if (validationResult.valid) {
-      // Get available phone numbers
-      const phoneNumbers = await twilioService.getAvailablePhoneNumbers(accountSid, authToken);
+      // Test against Twilio API directly
+      const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
+        {
+          headers: {
+            'Authorization': `Basic ${authString}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
 
-      return NextResponse.json({
-        valid: true,
-        phoneNumbers
-      });
-    } else {
+      if (response.ok) {
+        // Get phone numbers
+        const numbersResponse = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`,
+          {
+            headers: {
+              'Authorization': `Basic ${authString}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+
+        let phoneNumbers: any[] = [];
+        if (numbersResponse.ok) {
+          const numbersData = await numbersResponse.json();
+          phoneNumbers = (numbersData.incoming_phone_numbers || []).map((number: any) => ({
+            sid: number.sid,
+            phoneNumber: number.phone_number,
+            friendlyName: number.friendly_name
+          }));
+        }
+
+        return NextResponse.json({
+          valid: true,
+          phoneNumbers
+        });
+      } else if (response.status === 401) {
+        return NextResponse.json({
+          valid: false,
+          error: 'Invalid Account SID or Auth Token'
+        });
+      } else {
+        const errorText = await response.text();
+        return NextResponse.json({
+          valid: false,
+          error: `Twilio API error: ${response.status}`
+        });
+      }
+    } catch (fetchError: any) {
+      console.error('Twilio API fetch error:', fetchError);
       return NextResponse.json({
         valid: false,
-        error: validationResult.error
+        error: 'Failed to connect to Twilio API'
       });
     }
   } catch (error: any) {

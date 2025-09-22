@@ -367,12 +367,11 @@ export default function TwilioSettingsPage() {
                       updateForwardingOnly: true
                     })
 
-                    const response = await fetch('/api/twilio/settings', {
+                    const response = await fetch('/api/forwarding', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        ...config,
-                        updateForwardingOnly: true
+                        forwardingNumber: config.forwardingNumber
                       })
                     })
 

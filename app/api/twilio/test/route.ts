@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TwilioService } from '@/lib/twilio/service';
 import { createClient } from '@/lib/supabase/server';
 
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Method not allowed. Use POST to test Twilio credentials.' },
+    { status: 405 }
+  );
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();

@@ -113,7 +113,7 @@ export default function TwilioSettingsPage() {
     setSaving(true)
 
     try {
-      const response = await fetch('/api/twilio/configure', {
+      const response = await fetch('/api/twilio/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -367,7 +367,7 @@ export default function TwilioSettingsPage() {
                       updateForwardingOnly: true
                     })
 
-                    const response = await fetch('/api/twilio/configure', {
+                    const response = await fetch('/api/twilio/settings', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({

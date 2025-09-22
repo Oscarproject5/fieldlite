@@ -61,6 +61,9 @@ export async function POST(request: NextRequest) {
 
     // If only updating forwarding number
     if (updateForwardingOnly) {
+      console.log('Updating forwarding number for tenant:', profile.tenant_id);
+      console.log('New forwarding number:', forwardingNumber);
+
       if (!forwardingNumber) {
         return NextResponse.json(
           { error: 'Forwarding number is required' },
@@ -69,13 +72,16 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if a configuration exists first
-      const { data: existingConfig } = await supabase
+      const { data: existingConfig, error: fetchError } = await supabase
         .from('twilio_configurations')
-        .select('id')
+        .select('id, tenant_id, phone_number')
         .eq('tenant_id', profile.tenant_id)
         .single();
 
-      if (!existingConfig) {
+      console.log('Existing config lookup result:', { existingConfig, fetchError });
+
+      if (fetchError || !existingConfig) {
+        console.error('No existing configuration found:', fetchError);
         return NextResponse.json(
           { error: 'Please complete the Twilio setup first before configuring forwarding number' },
           { status: 400 }
@@ -83,12 +89,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Update only the forwarding number
-      const { error: updateError } = await supabase
+      console.log('Attempting to update forwarding number for config ID:', existingConfig.id);
+      const { data: updateData, error: updateError } = await supabase
         .from('twilio_configurations')
         .update({
-          forwarding_number: forwardingNumber
+          forwarding_number: forwardingNumber,
+          updated_at: new Date().toISOString()
         })
-        .eq('tenant_id', profile.tenant_id);
+        .eq('id', existingConfig.id)
+        .select();
+
+      console.log('Update result:', { updateData, updateError });
 
       if (updateError) {
         console.error('Failed to update forwarding number:', updateError);

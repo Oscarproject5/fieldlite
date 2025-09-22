@@ -33,8 +33,40 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { accountSid, authToken, phoneNumber, phoneNumberSid } = body;
+    const { accountSid, authToken, phoneNumber, phoneNumberSid, forwardingNumber, updateForwardingOnly } = body;
 
+    // If only updating forwarding number
+    if (updateForwardingOnly) {
+      if (!forwardingNumber) {
+        return NextResponse.json(
+          { error: 'Forwarding number is required' },
+          { status: 400 }
+        );
+      }
+
+      // Update only the forwarding number
+      const { error: updateError } = await supabase
+        .from('twilio_configurations')
+        .update({
+          forwarding_number: forwardingNumber
+        })
+        .eq('tenant_id', profile.tenant_id);
+
+      if (updateError) {
+        console.error('Failed to update forwarding number:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to update forwarding number' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Forwarding number updated successfully'
+      });
+    }
+
+    // For full configuration update
     if (!accountSid || !authToken || !phoneNumber || !phoneNumberSid) {
       return NextResponse.json(
         { error: 'All fields are required' },
@@ -67,34 +99,48 @@ export async function POST(request: NextRequest) {
 
     if (existingConfig) {
       // Update existing configuration
+      const updateData: any = {
+        account_sid: accountSid,
+        auth_token: encryptedAuthToken,
+        phone_number: phoneNumber,
+        phone_number_sid: phoneNumberSid,
+        is_active: true,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+        webhook_base_url: process.env.NEXT_PUBLIC_APP_URL
+      };
+
+      // Include forwarding number if provided
+      if (forwardingNumber) {
+        updateData.forwarding_number = forwardingNumber;
+      }
+
       result = await supabase
         .from('twilio_configurations')
-        .update({
-          account_sid: accountSid,
-          auth_token: encryptedAuthToken,
-          phone_number: phoneNumber,
-          phone_number_sid: phoneNumberSid,
-          is_active: true,
-          is_verified: true,
-          verified_at: new Date().toISOString(),
-          webhook_base_url: process.env.NEXT_PUBLIC_APP_URL
-        })
+        .update(updateData)
         .eq('id', existingConfig.id);
     } else {
       // Create new configuration
+      const insertData: any = {
+        tenant_id: profile.tenant_id,
+        account_sid: accountSid,
+        auth_token: encryptedAuthToken,
+        phone_number: phoneNumber,
+        phone_number_sid: phoneNumberSid,
+        is_active: true,
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+        webhook_base_url: process.env.NEXT_PUBLIC_APP_URL
+      };
+
+      // Include forwarding number if provided
+      if (forwardingNumber) {
+        insertData.forwarding_number = forwardingNumber;
+      }
+
       result = await supabase
         .from('twilio_configurations')
-        .insert({
-          tenant_id: profile.tenant_id,
-          account_sid: accountSid,
-          auth_token: encryptedAuthToken,
-          phone_number: phoneNumber,
-          phone_number_sid: phoneNumberSid,
-          is_active: true,
-          is_verified: true,
-          verified_at: new Date().toISOString(),
-          webhook_base_url: process.env.NEXT_PUBLIC_APP_URL
-        });
+        .insert(insertData);
     }
 
     if (result.error) {

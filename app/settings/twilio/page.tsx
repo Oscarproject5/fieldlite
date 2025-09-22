@@ -20,7 +20,8 @@ export default function TwilioSettingsPage() {
     accountSid: '',
     authToken: '',
     phoneNumber: '',
-    phoneNumberSid: ''
+    phoneNumberSid: '',
+    forwardingNumber: ''
   })
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -57,7 +58,8 @@ export default function TwilioSettingsPage() {
             accountSid: twilioConfig.account_sid,
             authToken: '', // Don't show existing token
             phoneNumber: twilioConfig.phone_number || '',
-            phoneNumberSid: twilioConfig.phone_number_sid || ''
+            phoneNumberSid: twilioConfig.phone_number_sid || '',
+            forwardingNumber: twilioConfig.forwarding_number || ''
           })
         }
       }
@@ -326,13 +328,90 @@ export default function TwilioSettingsPage() {
         <TabsContent value="settings">
           <Card>
             <CardHeader>
+              <CardTitle>Call Forwarding Settings</CardTitle>
+              <CardDescription>
+                Configure where incoming calls should be forwarded
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forwardingNumber">Forwarding Phone Number</Label>
+                <Input
+                  id="forwardingNumber"
+                  type="tel"
+                  value={config.forwardingNumber}
+                  onChange={(e) => setConfig({ ...config, forwardingNumber: e.target.value })}
+                  placeholder="+1234567890"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Enter the phone number where incoming calls should be forwarded. Include country code (e.g., +1 for US).
+                </p>
+              </div>
+
+              <Button
+                onClick={async () => {
+                  setSaving(true)
+                  try {
+                    const response = await fetch('/api/twilio/configure', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        ...config,
+                        updateForwardingOnly: true
+                      })
+                    })
+
+                    if (response.ok) {
+                      setTestResult({
+                        success: true,
+                        message: 'Forwarding number updated successfully!'
+                      })
+                      await loadExistingConfig()
+                    } else {
+                      const data = await response.json()
+                      setTestResult({
+                        success: false,
+                        message: data.error || 'Failed to update forwarding number'
+                      })
+                    }
+                  } catch (error) {
+                    setTestResult({
+                      success: false,
+                      message: 'Failed to update forwarding number. Please try again.'
+                    })
+                  } finally {
+                    setSaving(false)
+                  }
+                }}
+                disabled={!config.forwardingNumber || saving}
+                className="w-full"
+              >
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Forwarding Number
+              </Button>
+
+              {testResult && (
+                <Alert variant={testResult.success ? 'default' : 'destructive'}>
+                  {testResult.success ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  <AlertDescription>{testResult.message}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
               <CardTitle>Advanced Settings</CardTitle>
               <CardDescription>
-                Configure call recording, voicemail, and routing options
+                Additional call routing and recording options
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Advanced settings coming soon...</p>
+              <p className="text-muted-foreground">More advanced settings coming soon...</p>
             </CardContent>
           </Card>
         </TabsContent>

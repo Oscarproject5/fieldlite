@@ -31,15 +31,33 @@ export async function POST(request: NextRequest) {
       // Add a status callback to track the call
       twiml.dial().setAttribute('action', `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/voice/status`);
     } else {
-      // For inbound calls, forward to your phone
+      // For inbound calls, get forwarding number from the database
+      let forwardToNumber = process.env.FORWARD_PHONE_NUMBER || '+1234567890'; // Default fallback
+
+      // Try to get forwarding number from the database based on the phone number being called
+      try {
+        // Find the tenant by matching the Twilio phone number
+        const { data: twilioConfig } = await supabase
+          .from('twilio_configurations')
+          .select('forwarding_number')
+          .eq('phone_number', callData.to)
+          .eq('is_active', true)
+          .single();
+
+        if (twilioConfig?.forwarding_number) {
+          forwardToNumber = twilioConfig.forwarding_number;
+          console.log('Using forwarding number from database:', forwardToNumber);
+        } else {
+          console.log('No forwarding number found in database, using default');
+        }
+      } catch (error) {
+        console.error('Error fetching forwarding number:', error);
+      }
+
       twiml.say({
         voice: 'alice',
         language: 'en-US'
       }, 'Thank you for calling. Connecting you now.');
-
-      // Forward the call to your phone number
-      // IMPORTANT: Replace with your actual phone number
-      const forwardToNumber = process.env.FORWARD_PHONE_NUMBER || '+1234567890'; // Replace with your number
 
       twiml.dial({
         callerId: callData.from, // Show the original caller's number

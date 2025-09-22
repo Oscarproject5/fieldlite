@@ -3,10 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import { encrypt } from '@/lib/encryption';
 import { TwilioService } from '@/lib/twilio/service';
 
-// Runtime configuration for Vercel
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 export async function GET() {
   return NextResponse.json(
     { error: 'Method not allowed. Use POST to configure Twilio.' },

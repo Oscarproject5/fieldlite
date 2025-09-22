@@ -7,6 +7,14 @@ import { TwilioService } from '@/lib/twilio/service';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Handle GET method
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Method not allowed. Use POST to configure Twilio.' },
+    { status: 405 }
+  );
+}
+
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
       if (updateError) {
         console.error('Failed to update forwarding number:', updateError);
         return NextResponse.json(
-          { error: `Failed to update forwarding number: ${updateError.message}` },
+          { error: updateError.message || 'Failed to update forwarding number' },
           { status: 500 }
         );
       }

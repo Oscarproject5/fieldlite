@@ -3,6 +3,22 @@ import { createClient } from '@/lib/supabase/server';
 import { encrypt } from '@/lib/encryption';
 import { TwilioService } from '@/lib/twilio/service';
 
+// Force dynamic rendering for Vercel
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -44,6 +60,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Check if a configuration exists first
+      const { data: existingConfig } = await supabase
+        .from('twilio_configurations')
+        .select('id')
+        .eq('tenant_id', profile.tenant_id)
+        .single();
+
+      if (!existingConfig) {
+        return NextResponse.json(
+          { error: 'Please complete the Twilio setup first before configuring forwarding number' },
+          { status: 400 }
+        );
+      }
+
       // Update only the forwarding number
       const { error: updateError } = await supabase
         .from('twilio_configurations')
@@ -55,7 +85,7 @@ export async function POST(request: NextRequest) {
       if (updateError) {
         console.error('Failed to update forwarding number:', updateError);
         return NextResponse.json(
-          { error: 'Failed to update forwarding number' },
+          { error: `Failed to update forwarding number: ${updateError.message}` },
           { status: 500 }
         );
       }

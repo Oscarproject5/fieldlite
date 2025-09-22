@@ -334,6 +334,15 @@ export default function TwilioSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!existingConfig?.is_active && (
+                <Alert className="mb-4" variant="default">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Please complete the Twilio setup in the Setup tab first before configuring forwarding number.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="forwardingNumber">Forwarding Phone Number</Label>
                 <Input
@@ -342,6 +351,7 @@ export default function TwilioSettingsPage() {
                   value={config.forwardingNumber}
                   onChange={(e) => setConfig({ ...config, forwardingNumber: e.target.value })}
                   placeholder="+1234567890"
+                  disabled={!existingConfig?.is_active}
                 />
                 <p className="text-sm text-muted-foreground">
                   Enter the phone number where incoming calls should be forwarded. Include country code (e.g., +1 for US).
@@ -383,7 +393,7 @@ export default function TwilioSettingsPage() {
                     setSaving(false)
                   }
                 }}
-                disabled={!config.forwardingNumber || saving}
+                disabled={!config.forwardingNumber || saving || !existingConfig?.is_active}
                 className="w-full"
               >
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

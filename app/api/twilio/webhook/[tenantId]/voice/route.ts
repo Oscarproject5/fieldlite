@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(
@@ -32,22 +31,30 @@ export async function POST(
       });
     }
 
-    // Generate TwiML response
-    const twiml = new twilio.twiml.VoiceResponse();
+    // Get forwarding number from tenant configuration
+    const { data: twilioConfig } = await supabase
+      .from('twilio_configurations')
+      .select('forwarding_number')
+      .eq('tenant_id', tenantId)
+      .single();
 
-    // Simple greeting - you can customize this based on tenant settings
-    twiml.say({
-      voice: 'alice',
-      language: 'en-US'
-    }, 'Thank you for calling. Please hold while we connect you.');
+    // Generate TwiML response WITHOUT Twilio SDK
+    let twimlResponse = '<?xml version="1.0" encoding="UTF-8"?>';
+    twimlResponse += '<Response>';
 
-    // Forward the call to a configured number (you'd fetch this from tenant settings)
-    // For now, just play hold music
-    twiml.play({
-      loop: 1
-    }, 'http://com.twilio.music.classical.s3.amazonaws.com/ClockworkWaltz.mp3');
+    if (twilioConfig?.forwarding_number) {
+      // Forward the call if forwarding number is configured
+      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Connecting you now.</Say>';
+      twimlResponse += `<Dial>${twilioConfig.forwarding_number}</Dial>`;
+    } else {
+      // Default response if no forwarding number
+      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Please hold while we connect you.</Say>';
+      twimlResponse += '<Play loop="1">http://com.twilio.music.classical.s3.amazonaws.com/ClockworkWaltz.mp3</Play>';
+    }
 
-    return new NextResponse(twiml.toString(), {
+    twimlResponse += '</Response>';
+
+    return new NextResponse(twimlResponse, {
       status: 200,
       headers: {
         'Content-Type': 'text/xml'

@@ -1,36 +1,204 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FieldLite CRM
 
-## Getting Started
+A modern CRM solution for local service businesses built with Next.js 15, Supabase, and TypeScript.
 
-First, run the development server:
+## 🚀 Quick Start
 
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Supabase account (free tier works)
+- Stripe account (for payments)
+
+### Setup Instructions
+
+1. **Clone and Install Dependencies**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd fieldlite-crm
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Set up Supabase**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+   a. Create a new Supabase project at [https://app.supabase.com](https://app.supabase.com)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   b. Go to the SQL Editor in your Supabase dashboard
 
-## Learn More
+   c. Run the migration script from `supabase/migrations/001_initial_schema.sql`
 
-To learn more about Next.js, take a look at the following resources:
+   d. Enable Google OAuth (optional):
+      - Go to Authentication → Providers
+      - Enable Google provider
+      - Add your Google OAuth credentials
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Configure Environment Variables**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   Copy the environment variables from your Supabase project:
 
-## Deploy on Vercel
+   - Go to Settings → API in Supabase dashboard
+   - Update `.env.local` with your values:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-key
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Run the Development Server**
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to see the application.
+
+## 📁 Project Structure
+
+```
+fieldlite-crm/
+├── app/                    # Next.js 15 app directory
+│   ├── auth/              # Authentication pages
+│   │   ├── login/
+│   │   └── signup/
+│   ├── dashboard/         # Main dashboard
+│   └── (other routes)/
+├── components/            # React components
+│   └── dashboard/        # Dashboard-specific components
+├── lib/                   # Utilities and configurations
+│   └── supabase/         # Supabase client setup
+├── supabase/             # Database migrations
+│   └── migrations/
+└── middleware.ts         # Auth middleware
+```
+
+## 🔐 Authentication Flow
+
+1. Users sign up with email/password or Google OAuth
+2. Creates a tenant and profile in the database
+3. All data is isolated by tenant using Row Level Security
+4. Session management handled by Supabase Auth
+
+## 🗄️ Database Schema
+
+The database includes:
+- Multi-tenant architecture with RLS
+- Contacts (leads, customers, vendors)
+- Deals/Opportunities pipeline
+- Estimates and line items
+- Jobs and scheduling
+- Invoicing and payments
+- Time tracking
+- Messaging system
+- Audit logs
+
+## 🎯 Current Features
+
+### Phase 1 ✅ (Foundation)
+- [x] Next.js 15 with TypeScript setup
+- [x] Supabase integration
+- [x] Multi-tenant database schema
+- [x] Authentication (email/password + Google OAuth)
+- [x] Basic dashboard layout
+- [x] Row Level Security policies
+
+### Next Steps (Phase 2)
+- [ ] Contacts module (CRUD operations)
+- [ ] Deals pipeline with Kanban view
+- [ ] Catalog/pricebook system
+- [ ] Lead capture webhooks
+
+## 🚦 Development Workflow
+
+1. **Start development server:**
+```bash
+npm run dev
+```
+
+2. **Build for production:**
+```bash
+npm run build
+```
+
+3. **Run production build:**
+```bash
+npm start
+```
+
+## 🔧 Tech Stack
+
+- **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend:** Supabase (PostgreSQL, Auth, Realtime, Storage)
+- **Authentication:** Supabase Auth
+- **Payments:** Stripe (to be integrated)
+- **Forms:** React Hook Form + Zod validation
+- **Icons:** Lucide React
+- **State:** Zustand
+
+## 📝 Environment Variables
+
+Required environment variables:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Stripe (Phase 5)
+STRIPE_SECRET_KEY=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# Twilio (Phase 6)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+# SendGrid (Phase 6)
+SENDGRID_API_KEY=
+SENDGRID_FROM_EMAIL=
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NODE_ENV=development
+```
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+1. **Authentication not working:**
+   - Verify Supabase URL and anon key in `.env.local`
+   - Check if RLS policies are applied correctly
+   - Ensure email confirmations are disabled for testing
+
+2. **Database queries failing:**
+   - Check if migrations ran successfully
+   - Verify RLS policies match your user's tenant
+   - Check Supabase dashboard for error logs
+
+3. **Build errors:**
+   - Clear `.next` folder and rebuild
+   - Update dependencies: `npm update`
+   - Check TypeScript errors: `npm run type-check`
+
+## 📚 Documentation
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [React Hook Form](https://react-hook-form.com/)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.

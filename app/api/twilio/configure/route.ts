@@ -7,16 +7,15 @@ import { TwilioService } from '@/lib/twilio/service';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Handle GET method
-export async function GET() {
+// Explicitly export HTTP methods for Vercel
+export const GET = async () => {
   return NextResponse.json(
     { error: 'Method not allowed. Use POST to configure Twilio.' },
     { status: 405 }
   );
-}
+};
 
-// Handle OPTIONS for CORS preflight
-export async function OPTIONS(request: NextRequest) {
+export const OPTIONS = async () => {
   return new NextResponse(null, {
     status: 200,
     headers: {
@@ -25,9 +24,9 @@ export async function OPTIONS(request: NextRequest) {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
-}
+};
 
-export async function POST(request: NextRequest) {
+export const POST = async (request: NextRequest) => {
   try {
     const supabase = await createClient();
 
@@ -253,4 +252,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};

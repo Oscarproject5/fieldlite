@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Phone, Check, X, Loader2, AlertCircle, PhoneCall, Settings, Key } from 'lucide-react'
+import { TestConfiguration } from '@/components/twilio/test-configuration'
 
 export default function TwilioSettingsPage() {
   const [loading, setLoading] = useState(false)
@@ -316,17 +317,10 @@ export default function TwilioSettingsPage() {
         </TabsContent>
 
         <TabsContent value="test">
-          <Card>
-            <CardHeader>
-              <CardTitle>Test Your Configuration</CardTitle>
-              <CardDescription>
-                Make a test call to verify everything is working
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Test functionality coming soon...</p>
-            </CardContent>
-          </Card>
+          <TestConfiguration
+            isConfigured={!!existingConfig?.is_active}
+            phoneNumber={existingConfig?.phone_number}
+          />
         </TabsContent>
 
         <TabsContent value="settings">

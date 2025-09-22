@@ -45,12 +45,22 @@ export class TwilioService {
         .from('twilio_configurations')
         .select('*')
         .eq('tenant_id', this.tenantId)
-        .eq('is_active', true)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle no results gracefully
 
-      if (error || !data) {
-        console.log('No active Twilio configuration found for tenant:', this.tenantId);
+      if (error) {
+        console.error('Error fetching Twilio configuration:', error);
         return false;
+      }
+
+      if (!data) {
+        console.log('No Twilio configuration found for tenant:', this.tenantId);
+        return false;
+      }
+
+      // Check if configuration is active
+      if (!data.is_active) {
+        console.log('Twilio configuration exists but is not active for tenant:', this.tenantId);
+        // Still allow initialization for testing purposes
       }
 
       // Decrypt the auth token
@@ -61,10 +71,25 @@ export class TwilioService {
         auth_token: decryptedAuthToken
       };
 
-      // Initialize Twilio client
-      this.client = twilio(this.config.account_sid, this.config.auth_token);
+      // Validate that we have required fields
+      if (!this.config.account_sid || !this.config.auth_token || !this.config.phone_number) {
+        console.error('Twilio configuration is incomplete:', {
+          hasAccountSid: !!this.config.account_sid,
+          hasAuthToken: !!this.config.auth_token,
+          hasPhoneNumber: !!this.config.phone_number
+        });
+        return false;
+      }
 
-      return true;
+      // Initialize Twilio client
+      try {
+        this.client = twilio(this.config.account_sid, this.config.auth_token);
+        console.log('Twilio client initialized successfully for tenant:', this.tenantId);
+        return true;
+      } catch (error) {
+        console.error('Failed to initialize Twilio client:', error);
+        return false;
+      }
     } catch (error) {
       console.error('Failed to initialize Twilio service:', error);
       return false;
@@ -77,6 +102,97 @@ export class TwilioService {
 
   getConfig(): TwilioConfig | null {
     return this.config;
+  }
+
+  // Alias for getConfig to match API usage
+  async getConfiguration(): Promise<TwilioConfig | null> {
+    if (!this.config) {
+      await this.initialize();
+    }
+    return this.config;
+  }
+
+  async makeCall(params: {
+    to: string;
+    twimlContent?: string;
+    userId: string;
+    contactId?: string | null;
+  }): Promise<{ success: boolean; call?: any; error?: string }> {
+    if (!this.client || !this.config) {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        return { success: false, error: 'Failed to initialize Twilio service' };
+      }
+    }
+
+    try {
+      // Create TwiML application if twimlContent is provided
+      let url = `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/voice/answer`;
+
+      if (params.twimlContent) {
+        // For test calls with custom TwiML, we'll use TwiML bins or echo the content
+        // In production, you'd want to create a proper TwiML application
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say({ voice: 'alice' }, 'This is a test call from FieldLite CRM. Press any key to end this call.');
+        twiml.pause({ length: 2 });
+        twiml.say({ voice: 'alice' }, 'Thank you for testing. Goodbye!');
+
+        // Use echo TwiML for testing
+        url = `http://twimlets.com/echo?Twiml=${encodeURIComponent(params.twimlContent || twiml.toString())}`;
+      }
+
+      const call = await this.client!.calls.create({
+        from: this.config!.phone_number,
+        to: params.to,
+        url: url,
+        statusCallback: `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/voice/status`,
+        statusCallbackMethod: 'POST',
+        record: false
+      });
+
+      // Log the call
+      await this.logCall({
+        twilio_call_sid: call.sid,
+        from_number: call.from,
+        to_number: call.to,
+        direction: 'outbound',
+        status: call.status,
+        user_id: params.userId,
+        contact_id: params.contactId
+      });
+
+      return { success: true, call };
+    } catch (error: any) {
+      console.error('Failed to make call:', error);
+      return { success: false, error: error.message || 'Failed to make call' };
+    }
+  }
+
+  async sendSMS(params: {
+    to: string;
+    body: string;
+    contactId?: string | null;
+  }): Promise<{ success: boolean; message?: any; error?: string }> {
+    if (!this.client || !this.config) {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        return { success: false, error: 'Failed to initialize Twilio service' };
+      }
+    }
+
+    try {
+      const message = await this.client!.messages.create({
+        from: this.config!.phone_number,
+        to: params.to,
+        body: params.body,
+        statusCallback: `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/sms/status`
+      });
+
+      return { success: true, message };
+    } catch (error: any) {
+      console.error('Failed to send SMS:', error);
+      return { success: false, error: error.message || 'Failed to send SMS' };
+    }
   }
 
   async validateCredentials(accountSid: string, authToken: string): Promise<{ valid: boolean; error?: string }> {
@@ -116,41 +232,6 @@ export class TwilioService {
     }
   }
 
-  async makeCall(callData: CallData): Promise<any> {
-    if (!this.client || !this.config) {
-      throw new Error('Twilio service not initialized');
-    }
-
-    try {
-      const callParams: any = {
-        from: callData.from || this.config.phone_number,
-        to: callData.to,
-        url: callData.url || `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/voice/answer`,
-        statusCallback: callData.statusCallback,
-        statusCallbackMethod: callData.statusCallbackMethod || 'POST',
-        record: callData.record || false
-      };
-
-      // Add optional parameters if provided
-      if (callData.statusCallbackEvent) {
-        callParams.statusCallbackEvent = callData.statusCallbackEvent;
-      }
-      if (callData.recordingStatusCallback) {
-        callParams.recordingStatusCallback = callData.recordingStatusCallback;
-        callParams.recordingStatusCallbackMethod = callData.recordingStatusCallbackMethod || 'POST';
-      }
-      if (callData.machineDetection) {
-        callParams.machineDetection = callData.machineDetection;
-      }
-
-      const call = await this.client.calls.create(callParams);
-
-      return call;
-    } catch (error) {
-      console.error('Failed to make call:', error);
-      throw error;
-    }
-  }
 
   async logCall(callData: any): Promise<void> {
     try {

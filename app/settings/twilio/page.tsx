@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Phone, Check, X, Loader2, AlertCircle, PhoneCall, Settings, Key } from 'lucide-react'
+import { Phone, Check, X, Loader2, AlertCircle, PhoneCall, Settings, Key, Webhook } from 'lucide-react'
 import { TestConfiguration } from '@/components/twilio/test-configuration'
 
 export default function TwilioSettingsPage() {
@@ -26,6 +26,8 @@ export default function TwilioSettingsPage() {
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [existingConfig, setExistingConfig] = useState<any>(null)
+  const [configuringWebhooks, setConfiguringWebhooks] = useState(false)
+  const [webhookConfig, setWebhookConfig] = useState<any>(null)
 
   const supabase = createClient()
 
@@ -106,6 +108,49 @@ export default function TwilioSettingsPage() {
       })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const configureWebhooks = async () => {
+    setConfiguringWebhooks(true)
+    setWebhookConfig(null)
+
+    try {
+      const response = await fetch('/api/twilio/configure-webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setWebhookConfig({
+          success: true,
+          message: data.message,
+          webhookUrls: data.webhookUrls
+        })
+      } else if (data.manual) {
+        // Show manual configuration instructions
+        setWebhookConfig({
+          success: false,
+          manual: true,
+          message: data.error,
+          webhookUrls: data.webhookUrls,
+          instructions: data.instructions
+        })
+      } else {
+        setWebhookConfig({
+          success: false,
+          message: data.error || 'Failed to configure webhooks'
+        })
+      }
+    } catch (error) {
+      setWebhookConfig({
+        success: false,
+        message: 'An error occurred while configuring webhooks'
+      })
+    } finally {
+      setConfiguringWebhooks(false)
     }
   }
 
@@ -307,6 +352,76 @@ export default function TwilioSettingsPage() {
             </CardContent>
           </Card>
 
+          {existingConfig?.is_active && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Webhook Configuration</CardTitle>
+                <CardDescription>
+                  Configure Twilio to send call events to your application
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button
+                  onClick={configureWebhooks}
+                  disabled={configuringWebhooks}
+                  className="w-full"
+                  variant="outline"
+                >
+                  {configuringWebhooks ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Configuring Webhooks...
+                    </>
+                  ) : (
+                    <>
+                      <Webhook className="mr-2 h-4 w-4" />
+                      Configure Webhooks Automatically
+                    </>
+                  )}
+                </Button>
+
+                {webhookConfig && (
+                  <Alert variant={webhookConfig.success ? 'default' : 'destructive'}>
+                    {webhookConfig.success ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <AlertDescription>
+                      <p className="font-medium">{webhookConfig.message}</p>
+
+                      {webhookConfig.webhookUrls && (
+                        <div className="mt-3 space-y-2">
+                          <div className="p-2 bg-gray-50 rounded text-xs">
+                            <p className="font-medium mb-1">Voice Webhook:</p>
+                            <p className="font-mono break-all">{webhookConfig.webhookUrls.voice}</p>
+                          </div>
+                          <div className="p-2 bg-gray-50 rounded text-xs">
+                            <p className="font-medium mb-1">Status Webhook:</p>
+                            <p className="font-mono break-all">{webhookConfig.webhookUrls.status}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {webhookConfig.manual && webhookConfig.instructions && (
+                        <div className="mt-3">
+                          <p className="font-medium mb-2">Manual Setup Instructions:</p>
+                          <ol className="list-decimal list-inside text-sm space-y-1">
+                            {webhookConfig.instructions.map((instruction: string, index: number) => (
+                              <li key={index} className="text-sm">
+                                {instruction}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Getting Started</CardTitle>
@@ -334,6 +449,12 @@ export default function TwilioSettingsPage() {
                 <h3 className="font-semibold">4. Configure Here</h3>
                 <p className="text-sm text-muted-foreground">
                   Enter your credentials above and select your phone number.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold">5. Setup Webhooks</h3>
+                <p className="text-sm text-muted-foreground">
+                  Click "Configure Webhooks Automatically" after saving your configuration.
                 </p>
               </div>
             </CardContent>

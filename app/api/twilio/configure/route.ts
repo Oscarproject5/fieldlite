@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Explicitly export HTTP methods for Vercel
-export const GET = async () => {
+export async function GET() {
   return NextResponse.json(
     { error: 'Method not allowed. Use POST to configure Twilio.' },
     { status: 405 }
   );
-};
+}
 
-export const OPTIONS = async () => {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
@@ -24,9 +24,9 @@ export const OPTIONS = async () => {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
-};
+}
 
-export const POST = async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -252,4 +252,4 @@ export const POST = async (request: NextRequest) => {
       { status: 500 }
     );
   }
-};
+}

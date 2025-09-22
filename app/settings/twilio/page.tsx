@@ -79,7 +79,7 @@ export default function TwilioSettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountSid: config.accountSid,
+          accountSid: config.accountSid || existingConfig?.account_sid,
           authToken: config.authToken
         })
       })
@@ -159,6 +159,12 @@ export default function TwilioSettingsPage() {
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Phone className="h-8 w-8" />
           Twilio Configuration
+          {existingConfig?.is_active && (
+            <span className="ml-auto text-sm font-normal text-green-600 flex items-center gap-1">
+              <Check className="h-4 w-4" />
+              Active
+            </span>
+          )}
         </h1>
         <p className="text-muted-foreground mt-2">
           Connect your Twilio account to enable call tracking and SMS features
@@ -167,17 +173,23 @@ export default function TwilioSettingsPage() {
 
       <Tabs defaultValue="setup" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="setup">
+          <TabsTrigger value="setup" className="relative">
             <Key className="h-4 w-4 mr-2" />
             Setup
+            {existingConfig?.is_active && (
+              <span className="absolute top-1 right-1 h-2 w-2 bg-green-500 rounded-full" />
+            )}
           </TabsTrigger>
           <TabsTrigger value="test">
             <PhoneCall className="h-4 w-4 mr-2" />
             Test
           </TabsTrigger>
-          <TabsTrigger value="settings">
+          <TabsTrigger value="settings" className="relative">
             <Settings className="h-4 w-4 mr-2" />
             Settings
+            {existingConfig?.forwarding_number && (
+              <span className="absolute top-1 right-1 h-2 w-2 bg-green-500 rounded-full" />
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -195,6 +207,11 @@ export default function TwilioSettingsPage() {
                   <Check className="h-4 w-4" />
                   <AlertDescription>
                     Twilio is currently configured and active
+                    {existingConfig?.phone_number && (
+                      <span className="block mt-1 text-sm">
+                        Phone Number: {existingConfig.phone_number}
+                      </span>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -227,12 +244,17 @@ export default function TwilioSettingsPage() {
               <div className="flex gap-3">
                 <Button
                   onClick={testConnection}
-                  disabled={!config.accountSid || !config.authToken || testing}
+                  disabled={(!config.accountSid && !existingConfig?.account_sid) || !config.authToken || testing}
                   variant="secondary"
                 >
                   {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Test Connection
                 </Button>
+                {existingConfig?.is_active && !config.authToken && (
+                  <span className="text-sm text-muted-foreground self-center">
+                    Enter auth token to test or update configuration
+                  </span>
+                )}
               </div>
 
               {testResult && (
@@ -339,6 +361,20 @@ export default function TwilioSettingsPage() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     Please complete the Twilio setup in the Setup tab first before configuring forwarding number.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {existingConfig?.is_active && (
+                <Alert className="mb-4">
+                  <Check className="h-4 w-4" />
+                  <AlertDescription>
+                    Twilio is active and configured
+                    {existingConfig?.forwarding_number && (
+                      <span className="block mt-1 text-sm">
+                        Current forwarding number: {existingConfig.forwarding_number}
+                      </span>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}

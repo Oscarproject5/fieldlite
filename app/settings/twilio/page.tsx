@@ -371,20 +371,24 @@ export default function TwilioSettingsPage() {
                       })
                     })
 
-                    if (response.ok) {
+                    const data = await response.json()
+                    console.log('Response status:', response.status, response.ok)
+                    console.log('Response data:', data)
+
+                    if (response.ok && data.success) {
                       setTestResult({
                         success: true,
-                        message: 'Forwarding number updated successfully!'
+                        message: data.message || 'Forwarding number updated successfully!'
                       })
                       await loadExistingConfig()
                     } else {
-                      const data = await response.json()
                       setTestResult({
                         success: false,
                         message: data.error || 'Failed to update forwarding number'
                       })
                     }
                   } catch (error) {
+                    console.error('Error updating forwarding number:', error)
                     setTestResult({
                       success: false,
                       message: 'Failed to update forwarding number. Please try again.'

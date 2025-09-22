@@ -101,8 +101,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Encrypt the auth token
-    const encryptedAuthToken = encrypt(authToken);
+    // Encrypt the auth token using the account SID as salt for unique encryption per tenant
+    const encryptedAuthToken = encrypt(authToken, accountSid);
 
     // Check if configuration exists
     const { data: existingConfig } = await supabase

@@ -63,8 +63,8 @@ export class TwilioService {
         // Still allow initialization for testing purposes
       }
 
-      // Decrypt the auth token
-      const decryptedAuthToken = decrypt(data.auth_token);
+      // Decrypt the auth token using the account SID as salt
+      const decryptedAuthToken = decrypt(data.auth_token, data.account_sid);
 
       this.config = {
         ...data,

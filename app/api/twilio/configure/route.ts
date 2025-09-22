@@ -33,19 +33,32 @@ export async function POST(request: NextRequest) {
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('Auth check - User:', user?.id, 'Error:', authError?.message);
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('Authentication failed:', authError);
+      return NextResponse.json({
+        error: 'Unauthorized. Please log in again.',
+        details: authError?.message
+      }, { status: 401 });
     }
 
     // Get user's tenant and check permissions
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('tenant_id, role')
       .eq('id', user.id)
       .single();
 
-    if (!profile?.tenant_id) {
-      return NextResponse.json({ error: 'No tenant found' }, { status: 400 });
+    console.log('Profile lookup - Profile:', profile, 'Error:', profileError?.message);
+
+    if (profileError || !profile?.tenant_id) {
+      console.error('Profile/tenant lookup failed:', profileError);
+      return NextResponse.json({
+        error: 'No tenant found for user',
+        details: profileError?.message
+      }, { status: 400 });
     }
 
     // Only owners and managers can configure Twilio
@@ -109,10 +122,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         message: 'Forwarding number updated successfully'
       });
+
+      // Add CORS headers for Vercel
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+      return response;
     }
 
     // For full configuration update

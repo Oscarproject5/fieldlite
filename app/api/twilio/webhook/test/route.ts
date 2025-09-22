@@ -21,15 +21,17 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Try to get body first
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
     }
 
-    const body = await request.json();
     const { tenantId, testType } = body;
 
     if (!tenantId) {
@@ -39,18 +41,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the user has access to this tenant
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
+    const supabase = await createClient();
 
-    if (profile?.tenant_id !== tenantId) {
-      return NextResponse.json(
-        { error: 'Unauthorized access to this tenant' },
-        { status: 403 }
-      );
+    // Get authenticated user (but don't fail if not authenticated for now)
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // If user is authenticated, verify tenant access
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && profile.tenant_id !== tenantId) {
+        return NextResponse.json(
+          { error: 'Unauthorized access to this tenant' },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if Twilio configuration exists for this tenant

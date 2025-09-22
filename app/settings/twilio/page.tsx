@@ -362,6 +362,11 @@ export default function TwilioSettingsPage() {
                 onClick={async () => {
                   setSaving(true)
                   try {
+                    console.log('Sending request to update forwarding number:', {
+                      ...config,
+                      updateForwardingOnly: true
+                    })
+
                     const response = await fetch('/api/twilio/configure', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -371,9 +376,32 @@ export default function TwilioSettingsPage() {
                       })
                     })
 
-                    const data = await response.json()
-                    console.log('Response status:', response.status, response.ok)
-                    console.log('Response data:', data)
+                    console.log('Raw response:', response)
+                    console.log('Response status:', response.status)
+                    console.log('Response ok:', response.ok)
+                    console.log('Response headers:', response.headers)
+                    console.log('Content-Type:', response.headers.get('content-type'))
+
+                    // Check if response has body
+                    const responseText = await response.text()
+                    console.log('Response text:', responseText)
+
+                    // Check if response is HTML (error page)
+                    if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                      console.error('Received HTML response instead of JSON')
+                      console.error('This usually means the API endpoint is not found or there is a server error')
+                      throw new Error('Server returned an error page instead of JSON')
+                    }
+
+                    let data
+                    try {
+                      data = responseText ? JSON.parse(responseText) : {}
+                      console.log('Parsed response data:', data)
+                    } catch (parseError) {
+                      console.error('Failed to parse response:', parseError)
+                      console.error('Response was:', responseText)
+                      throw new Error('Invalid response from server')
+                    }
 
                     if (response.ok && data.success) {
                       setTestResult({

@@ -58,8 +58,10 @@ export async function POST(request: NextRequest) {
     const { decrypt } = await import('@/lib/encryption');
     const authToken = decrypt(twilioConfig.auth_token, twilioConfig.account_sid);
 
-    // Generate webhook URLs
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fieldlite.vercel.app';
+    // Generate webhook URLs dynamically based on the current domain
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const host = request.headers.get('host') || 'localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const voiceWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/voice`;
     const statusWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/status`;
 
@@ -140,7 +142,9 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (profile?.tenant_id) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fieldlite.vercel.app';
+        const protocol = request.headers.get('x-forwarded-proto') || 'http';
+        const host = request.headers.get('host') || 'localhost:3000';
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
         const voiceWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/voice`;
         const statusWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/status`;
 

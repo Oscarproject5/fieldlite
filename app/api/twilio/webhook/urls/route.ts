@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  const tenantId = request.nextUrl.searchParams.get('tenant_id') || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+  const tenantId = request.nextUrl.searchParams.get('tenant_id');
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fieldlite.vercel.app';
-  const localUrl = 'http://localhost:3001';
+  if (!tenantId) {
+    return NextResponse.json({ error: 'tenant_id parameter is required' }, { status: 400 });
+  }
+
+  // Dynamically determine the base URL
+  const protocol = request.headers.get('x-forwarded-proto') || 'http';
+  const host = request.headers.get('host') || 'localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+  const localUrl = `http://${host}`;
 
   const webhookUrls = {
     production: {

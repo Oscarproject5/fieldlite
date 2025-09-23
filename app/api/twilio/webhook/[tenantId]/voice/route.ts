@@ -51,12 +51,12 @@ export async function POST(
       // Continue without failing
     }
 
-    // Try to get forwarding number from tenant configuration
+    // Try to get FULL configuration from tenant
     let twilioConfig = null;
     try {
       const result = await supabase
         .from('twilio_configurations')
-        .select('forwarding_number')
+        .select('*')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -73,15 +73,15 @@ export async function POST(
     if (twilioConfig?.forwarding_number) {
       // Forward the call if forwarding number is configured
       twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Connecting you now.</Say>';
-      // Add timeout and callerId for better call handling
-      twimlResponse += `<Dial timeout="30" callerId="${data.To || '+18339490539'}">${twilioConfig.forwarding_number}</Dial>`;
+      // Use the configured phone number as callerId (the Twilio number that received the call)
+      const callerId = twilioConfig.phone_number || data.To || data.Called;
+      twimlResponse += `<Dial timeout="30" callerId="${callerId}">${twilioConfig.forwarding_number}</Dial>`;
       // Add a message if the forwarding fails
       twimlResponse += '<Say voice="alice" language="en-US">Sorry, we could not connect your call. Please try again later.</Say>';
     } else {
-      // Default response if no forwarding number - just play hold music
-      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Your forwarding number is not configured. Please contact support.</Say>';
+      // Default response if no forwarding number configured by user
+      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. This number is not yet configured. Please contact the administrator.</Say>';
       twimlResponse += '<Pause length="2"/>';
-      twimlResponse += '<Say voice="alice" language="en-US">Goodbye.</Say>';
       twimlResponse += '<Hangup/>';
     }
 

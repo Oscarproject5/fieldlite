@@ -127,11 +127,8 @@ export function TestConfiguration({ isConfigured, phoneNumber }: TestConfigurati
         return
       }
 
-      // Generate webhook URLs for both local and production
-      const isProduction = window.location.hostname !== 'localhost'
-      const baseUrl = isProduction
-        ? 'https://fieldlite.vercel.app' // Your Vercel URL
-        : window.location.origin
+      // Generate webhook URLs dynamically based on current domain
+      const baseUrl = window.location.origin
 
       const voiceWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/voice`
       const statusWebhookUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/status`

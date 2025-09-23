@@ -6,6 +6,21 @@ export async function POST(
   { params }: { params: { tenantId: string } }
 ) {
   try {
+    // Check if environment variables are set
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase environment variables');
+      // Return basic response without database
+      let basicResponse = '<?xml version="1.0" encoding="UTF-8"?>';
+      basicResponse += '<Response>';
+      basicResponse += '<Say voice="alice">Thank you for calling. Service is temporarily unavailable.</Say>';
+      basicResponse += '</Response>';
+
+      return new NextResponse(basicResponse, {
+        status: 200,
+        headers: { 'Content-Type': 'text/xml' }
+      });
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -17,26 +32,39 @@ export async function POST(
       data[key] = value;
     });
 
-    console.log('Incoming voice webhook for tenant:', tenantId, data);
+    console.log('Incoming voice webhook for tenant:', tenantId);
 
-    // Log incoming call
-    if (data.CallSid && data.Direction === 'inbound') {
-      await supabase.from('calls').insert({
-        tenant_id: tenantId,
-        twilio_call_sid: data.CallSid,
-        from_number: data.From,
-        to_number: data.To,
-        direction: 'inbound',
-        status: 'ringing'
-      });
+    // Try to log incoming call (but don't fail if it doesn't work)
+    try {
+      if (data.CallSid && data.Direction === 'inbound') {
+        await supabase.from('calls').insert({
+          tenant_id: tenantId,
+          twilio_call_sid: data.CallSid,
+          from_number: data.From,
+          to_number: data.To,
+          direction: 'inbound',
+          status: 'ringing'
+        });
+      }
+    } catch (dbError) {
+      console.error('Could not log call:', dbError);
+      // Continue without failing
     }
 
-    // Get forwarding number from tenant configuration
-    const { data: twilioConfig } = await supabase
-      .from('twilio_configurations')
-      .select('forwarding_number')
-      .eq('tenant_id', tenantId)
-      .single();
+    // Try to get forwarding number from tenant configuration
+    let twilioConfig = null;
+    try {
+      const result = await supabase
+        .from('twilio_configurations')
+        .select('forwarding_number')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      twilioConfig = result.data;
+    } catch (configError) {
+      console.error('Could not fetch config:', configError);
+      // Continue without config
+    }
 
     // Generate TwiML response WITHOUT Twilio SDK
     let twimlResponse = '<?xml version="1.0" encoding="UTF-8"?>';

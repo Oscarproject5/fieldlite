@@ -72,21 +72,31 @@ export async function POST(
 
     if (error) {
       console.error('Failed to update call status:', error);
+      // Don't fail the webhook, just log the error
     }
 
-    // Log the event
-    await supabase.from('call_events').insert({
-      call_id: (await supabase
+    // Try to log the event (optional - don't fail if table doesn't exist)
+    try {
+      const { data: callRecord } = await supabase
         .from('calls')
         .select('id')
         .eq('twilio_call_sid', callSid)
-        .single()
-      ).data?.id,
-      event_type: `status_${callStatus}`,
-      event_data: data,
-      twilio_callback_source: data.CallbackSource || 'status_callback'
-    });
+        .single();
 
+      if (callRecord?.id) {
+        await supabase.from('call_events').insert({
+          call_id: callRecord.id,
+          event_type: `status_${callStatus}`,
+          event_data: data,
+          twilio_callback_source: data.CallbackSource || 'status_callback'
+        });
+      }
+    } catch (eventError) {
+      // Ignore event logging errors - table might not exist
+      console.log('Could not log call event (table may not exist):', eventError);
+    }
+
+    // Always return success to Twilio
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Status webhook error:', error);

@@ -38,15 +38,14 @@ export function ClickToCall({
     setCalling(true)
 
     try {
-      const response = await fetch('/api/calls/initiate', {
+      const response = await fetch('/api/twilio/call/outbound', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: phoneNumber,
           contactId,
           dealId,
-          jobId,
-          record: false // You can make this configurable
+          jobId
         })
       })
 

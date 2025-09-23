@@ -45,11 +45,16 @@ export async function POST(
     if (twilioConfig?.forwarding_number) {
       // Forward the call if forwarding number is configured
       twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Connecting you now.</Say>';
-      twimlResponse += `<Dial>${twilioConfig.forwarding_number}</Dial>`;
+      // Add timeout and callerId for better call handling
+      twimlResponse += `<Dial timeout="30" callerId="${data.To || '+18339490539'}">${twilioConfig.forwarding_number}</Dial>`;
+      // Add a message if the forwarding fails
+      twimlResponse += '<Say voice="alice" language="en-US">Sorry, we could not connect your call. Please try again later.</Say>';
     } else {
-      // Default response if no forwarding number
-      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Please hold while we connect you.</Say>';
-      twimlResponse += '<Play loop="1">http://com.twilio.music.classical.s3.amazonaws.com/ClockworkWaltz.mp3</Play>';
+      // Default response if no forwarding number - just play hold music
+      twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. Your forwarding number is not configured. Please contact support.</Say>';
+      twimlResponse += '<Pause length="2"/>';
+      twimlResponse += '<Say voice="alice" language="en-US">Goodbye.</Say>';
+      twimlResponse += '<Hangup/>';
     }
 
     twimlResponse += '</Response>';

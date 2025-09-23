@@ -76,8 +76,7 @@ export async function POST(
       // Use the configured phone number as callerId (the Twilio number that received the call)
       const callerId = twilioConfig.phone_number || data.To || data.Called;
       twimlResponse += `<Dial timeout="30" callerId="${callerId}">${twilioConfig.forwarding_number}</Dial>`;
-      // Add a message if the forwarding fails
-      twimlResponse += '<Say voice="alice" language="en-US">Sorry, we could not connect your call. Please try again later.</Say>';
+      // Don't add any message after - let the call end naturally
     } else {
       // Default response if no forwarding number configured by user
       twimlResponse += '<Say voice="alice" language="en-US">Thank you for calling. This number is not yet configured. Please contact the administrator.</Say>';

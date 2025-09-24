@@ -63,6 +63,7 @@ import { formatDistanceToNow, format } from 'date-fns'
 
 interface Contact {
   id: string
+  tenant_id?: string
   first_name: string
   last_name: string
   email: string
@@ -235,8 +236,26 @@ export default function ContactsPage() {
         return
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, tenant_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error('Error loading profile:', profileError)
+        setError('Failed to load user profile')
+        return
+      }
+
+      if (!profile.tenant_id) {
+        setError('No tenant associated with your profile. Please contact an administrator.')
+        return
+      }
+
       const contactData = {
         ...formData,
+        tenant_id: profile.tenant_id,
         user_id: user.id,
         updated_at: new Date().toISOString()
       }
@@ -996,3 +1015,6 @@ export default function ContactsPage() {
     </DashboardLayout>
   )
 }
+
+
+

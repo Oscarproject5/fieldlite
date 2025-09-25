@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/twilio/voice/answer/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/twilio/voice/status/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/twilio/sms/receive/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/twilio/sms/status/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

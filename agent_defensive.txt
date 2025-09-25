@@ -1,0 +1,41 @@
+Launching defensive thinker agent...
+Identifying security and edge cases for Twilio system:
+
+1. SECURITY CONCERNS:
+   - API key exposure in client-side code
+   - CSRF attacks on callback initiation
+   - Phone number spoofing and fraud
+   - Rate limiting to prevent abuse
+   - SQL injection in phone number storage
+   - XSS in call notes and transcriptions
+
+2. AUTHENTICATION & AUTHORIZATION:
+   - JWT tokens with short expiration
+   - Role-based access control (RBAC)
+   - IP whitelisting for production
+   - Webhook signature validation
+   - OAuth2 for third-party integrations
+
+3. ERROR HANDLING:
+   - Network timeout handling
+   - Twilio service degradation
+   - Invalid phone number formats
+   - Concurrent call limit exceeded
+   - Database connection failures
+   - Webhook delivery failures
+
+4. EDGE CASES:
+   - International number formatting
+   - Daylight saving time changes
+   - Do-not-call list compliance
+   - GDPR/CCPA data retention
+   - Emergency number blocking
+   - High-volume burst traffic
+
+5. MONITORING & COMPLIANCE:
+   - Call recording consent requirements
+   - PCI compliance for payment calls
+   - HIPAA compliance for healthcare
+   - Audit logging for all actions
+   - Automated security scanning
+   - Penetration testing schedule

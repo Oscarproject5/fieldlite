@@ -198,7 +198,10 @@ export async function POST(request: NextRequest) {
 
     // Create webhook URLs
     const statusCallback = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/status`;
-    const voiceUrl = `${baseUrl}/api/twilio/webhook/${profile.tenant_id}/voice/outbound`;
+
+    // For outbound calls, we need a simple TwiML URL that just connects the call
+    // Using Twimlets echo for a simple connection
+    const twimlUrl = `https://twimlets.com/echo?Twiml=%3CResponse%3E%3C%2FResponse%3E`;
 
     // Make the call using Twilio API with enhanced error handling
     const authString = Buffer.from(`${twilioConfig.account_sid}:${authToken}`).toString('base64');
@@ -215,13 +218,11 @@ export async function POST(request: NextRequest) {
         body: new URLSearchParams({
           'To': toNumber,
           'From': fromNumber,
-          'Url': voiceUrl,
+          'Url': twimlUrl,  // Simple empty TwiML response
           'StatusCallback': statusCallback,
           'StatusCallbackMethod': 'POST',
           'StatusCallbackEvent': 'initiated,ringing,answered,completed',
           'Record': 'false',
-          'MachineDetection': 'Enable',
-          'MachineDetectionTimeout': '30',
           'Timeout': '60'
         }).toString()
       }

@@ -36,17 +36,10 @@ export async function POST(
       twimlResponse += '<Say voice="alice">This call requires a human. Goodbye.</Say>';
       twimlResponse += '<Hangup/>';
     } else {
-      // Connect the call to the forwarding number (the person who initiated the call)
-      if (twilioConfig?.forwarding_number) {
-        twimlResponse += '<Say voice="alice">Connecting your call.</Say>';
-        twimlResponse += `<Dial>${twilioConfig.forwarding_number}</Dial>`;
-      } else {
-        // If no forwarding number, just announce and hang up
-        twimlResponse += '<Say voice="alice">This is a call from your business phone system.</Say>';
-        twimlResponse += '<Pause length="2"/>';
-        twimlResponse += '<Say voice="alice">Please configure your forwarding number to complete calls.</Say>';
-        twimlResponse += '<Hangup/>';
-      }
+      // For outbound calls, just play a message and let the call continue
+      // The call is already connected between the two parties
+      twimlResponse += '<Say voice="alice">Call connected.</Say>';
+      // Empty response lets Twilio continue with the normal call flow
     }
 
     twimlResponse += '</Response>';

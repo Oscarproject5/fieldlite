@@ -160,16 +160,6 @@ export async function POST(request: NextRequest) {
           { tenantId: profile.tenant_id }
         );
       }
-      // Strategy 1.5: Temporary hardcoded override for known tenant (REMOVE AFTER FIXING)
-      else if (profile.tenant_id === 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11') {
-        // Temporary fix - this tenant's token was encrypted with old key
-        authToken = 'ef3642ad83ba617ec4de79b20ef2c468';
-        decryptionMethod = 'temporary_override';
-        console.warn(
-          '[TEMPORARY FIX] Using hardcoded token for tenant - RE-SAVE SETTINGS TO ENCRYPT',
-          { tenantId: profile.tenant_id }
-        );
-      }
       // Strategy 2: If in development, try raw value (with warning)
       else if (process.env.NODE_ENV === 'development') {
         authToken = twilioConfig.auth_token;

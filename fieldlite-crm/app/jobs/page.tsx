@@ -1,241 +1,472 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Briefcase,
-  Search,
   Plus,
-  MapPin,
+  List,
+  Grid3x3,
   Calendar,
-  Filter,
-  Clock,
+  Map,
+  Download,
+  Upload,
+  RefreshCw,
+  Settings,
+  ChevronRight,
   CheckCircle,
-  AlertCircle
-} from 'lucide-react'
+  AlertCircle,
+  Briefcase,
+  Clock
+} from 'lucide-react';
+import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
+import { VirtualizedJobList } from '@/components/jobs/VirtualizedJobList';
+import { AdvancedJobSearch } from '@/components/jobs/AdvancedJobSearch';
+import { useJobStore } from '@/stores/jobStore';
+import type { Job, JobFilters } from '@/types/jobs';
+import { cn } from '@/lib/utils';
 
-interface Job {
-  id: string
-  job_number: string
-  title: string
-  description: string
-  status: string
-  scheduled_start: string
-  scheduled_end: string
-  actual_start: string
-  actual_end: string
-  address: any
-  assigned_to: string[]
-  crew_lead_id: string
-  deal_id: string
-  created_at: string
-  updated_at: string
-}
+// Metrics Card Component
+const MetricCard: React.FC<{
+  title: string;
+  value: string | number;
+  change?: number;
+  icon: React.ReactNode;
+  color?: string;
+}> = ({ title, value, change, icon, color = 'blue' }) => {
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-green-50 text-green-600',
+    yellow: 'bg-yellow-50 text-yellow-600',
+    red: 'bg-red-50 text-red-600',
+    purple: 'bg-purple-50 text-purple-600',
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold">{value}</p>
+            {change !== undefined && (
+              <p className={cn(
+                'text-xs',
+                change >= 0 ? 'text-green-600' : 'text-red-600'
+              )}>
+                {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% from last month
+              </p>
+            )}
+          </div>
+          <div className={cn('p-3 rounded-lg', colorClasses[color as keyof typeof colorClasses])}>
+            {icon}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const {
+    jobs,
+    jobsList,
+    isLoading,
+    error,
+    filters,
+    metrics,
+    selectedJobs,
+    viewMode,
+    sortBy,
+    sortOrder,
+    loadJobs,
+    loadMetrics,
+    setViewMode,
+    setSortBy,
+    toggleSortOrder,
+    selectAllJobs,
+    clearSelection,
+    bulkUpdateJobs,
+    subscribeToChanges,
+    unsubscribeFromChanges,
+  } = useJobStore();
 
-  const supabase = createClient()
+  const [bulkAction, setBulkAction] = useState('');
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
 
   useEffect(() => {
-    loadJobs()
-  }, [])
+    // Load initial data
+    loadJobs();
+    loadMetrics();
 
-  const loadJobs = async () => {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('created_at', { ascending: false })
+    // Subscribe to real-time changes
+    subscribeToChanges();
 
-      if (error) {
-        console.error('Error loading jobs:', error)
-      } else {
-        setJobs(data || [])
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setLoading(false)
+    // Cleanup
+    return () => {
+      unsubscribeFromChanges();
+    };
+  }, []);
+
+  const handleJobClick = useCallback((job: Job) => {
+    // Navigate to job detail page
+    window.location.href = `/jobs/${job.id}`;
+  }, []);
+
+  const handleJobAction = useCallback(async (job: Job, action: string) => {
+    switch (action) {
+      case 'view':
+        window.location.href = `/jobs/${job.id}`;
+        break;
+      case 'edit':
+        window.location.href = `/jobs/${job.id}/edit`;
+        break;
+      case 'delete':
+        // Implement delete confirmation
+        if (confirm(`Are you sure you want to delete job ${job.job_number}?`)) {
+          await useJobStore.getState().deleteJob(job.id);
+        }
+        break;
+      case 'start':
+        await useJobStore.getState().updateJob(job.id, {
+          status: 'in_progress',
+          actual_start: new Date()
+        });
+        break;
+      case 'complete':
+        await useJobStore.getState().updateJob(job.id, {
+          status: 'completed',
+          actual_end: new Date(),
+          completed_at: new Date()
+        });
+        break;
+      default:
+        console.log(`Action ${action} for job ${job.id}`);
     }
-  }
+  }, []);
 
-  const filteredJobs = jobs.filter(job =>
-    job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.job_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedJobs.size === 0) return;
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'scheduled': return 'secondary'
-      case 'in_progress': return 'warning'
-      case 'completed': return 'success'
-      case 'cancelled': return 'destructive'
-      case 'on_hold': return 'default'
-      default: return 'default'
+    const selectedJobIds = Array.from(selectedJobs);
+
+    switch (bulkAction) {
+      case 'delete':
+        if (confirm(`Delete ${selectedJobs.size} selected jobs?`)) {
+          for (const jobId of selectedJobIds) {
+            await useJobStore.getState().deleteJob(jobId);
+          }
+        }
+        break;
+      case 'complete':
+        await bulkUpdateJobs(selectedJobIds, {
+          status: 'completed',
+          completed_at: new Date()
+        });
+        break;
+      case 'assign':
+        // Open assignment modal
+        console.log('Assign jobs:', selectedJobIds);
+        break;
+      case 'export':
+        // Export selected jobs
+        console.log('Export jobs:', selectedJobIds);
+        break;
     }
-  }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority?.toLowerCase()) {
-      case 'low': return 'default'
-      case 'medium': return 'secondary'
-      case 'high': return 'warning'
-      case 'urgent': return 'destructive'
-      default: return 'default'
-    }
-  }
+    clearSelection();
+    setBulkAction('');
+  };
 
-  const activeJobs = jobs.filter(j => ['scheduled', 'in_progress'].includes(j.status?.toLowerCase())).length
-  const completedJobs = jobs.filter(j => j.status?.toLowerCase() === 'completed').length
+  const handleRefresh = () => {
+    loadJobs(filters);
+    loadMetrics();
+  };
+
+  // Get jobs array from the normalized store
+  const jobsArray = jobsList.map(id => jobs[id]).filter(Boolean);
 
   return (
     <DashboardLayout>
-      <div className="p-6">
-        <div className="mb-8 flex justify-between items-center">
+      <div className="flex flex-col h-full p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Briefcase className="h-8 w-8" />
               Jobs
             </h1>
             <p className="text-muted-foreground mt-2">
-              Manage field service jobs and work orders
+              Manage and track all service jobs
             </p>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Job
-          </Button>
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              onClick={() => setIsCreatingJob(true)}
+              className="bg-primary text-primary-foreground"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Job
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeJobs}</div>
-              <p className="text-xs text-muted-foreground">
-                In progress or scheduled
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{completedJobs}</div>
-              <p className="text-xs text-muted-foreground">
-                This month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{jobs.length}</div>
-              <p className="text-xs text-muted-foreground">
-                All time
-              </p>
-            </CardContent>
-          </Card>
+        {/* Metrics Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <MetricCard
+            title="Total Jobs"
+            value={metrics?.total_jobs || 0}
+            change={12}
+            icon={<Calendar className="h-6 w-6" />}
+            color="blue"
+          />
+          <MetricCard
+            title="In Progress"
+            value={metrics?.jobs_by_status?.in_progress || 0}
+            icon={<Clock className="h-6 w-6" />}
+            color="yellow"
+          />
+          <MetricCard
+            title="Completed Today"
+            value={metrics?.jobs_by_status?.completed || 0}
+            change={8}
+            icon={<CheckCircle className="h-6 w-6" />}
+            color="green"
+          />
+          <MetricCard
+            title="Overdue"
+            value={metrics?.overdue_jobs || 0}
+            change={-15}
+            icon={<AlertCircle className="h-6 w-6" />}
+            color="red"
+          />
         </div>
 
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search jobs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
+        {/* Search and Filters */}
+        <AdvancedJobSearch className="mb-4" />
+
+        {/* Bulk Actions Bar */}
+        {selectedJobs.size > 0 && (
+          <div className="flex items-center justify-between p-3 mb-4 bg-accent rounded-lg">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedJobs.size === jobsList.length}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    selectAllJobs();
+                  } else {
+                    clearSelection();
+                  }
+                }}
+              />
+              <span className="text-sm font-medium">
+                {selectedJobs.size} job{selectedJobs.size !== 1 ? 's' : ''} selected
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Select value={bulkAction} onValueChange={setBulkAction}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Bulk actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assign">Assign to Team</SelectItem>
+                  <SelectItem value="complete">Mark as Complete</SelectItem>
+                  <SelectItem value="export">Export Selected</SelectItem>
+                  <SelectItem value="delete">Delete Selected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleBulkAction}
+                disabled={!bulkAction}
+                size="sm"
+              >
+                Apply
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {loading ? (
-          <div className="text-center py-8">Loading jobs...</div>
-        ) : filteredJobs.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-500">No jobs found</p>
-              <Button className="mt-4">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Job
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredJobs.map((job) => (
-              <Card key={job.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-lg">{job.title}</h3>
-                        <Badge variant={getStatusColor(job.status) as any}>
-                          {job.status}
-                        </Badge>
-                        {job.job_number && (
-                          <Badge variant="outline">
-                            #{job.job_number}
-                          </Badge>
-                        )}
-                      </div>
-                      {job.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2">{job.description}</p>
-                      )}
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
-                        {job.address && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {typeof job.address === 'string' ? job.address : job.address?.street || 'Location'}
-                          </span>
-                        )}
-                        {job.scheduled_start && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(job.scheduled_start).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">View Details</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         )}
+
+        {/* View Controls */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border p-1">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setViewMode('calendar')}
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'map' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setViewMode('map')}
+              >
+                <Map className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Separator orientation="vertical" className="h-8" />
+
+            <Select
+              value={sortBy}
+              onValueChange={(value: any) => setSortBy(value)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+                <SelectItem value="customer">Customer</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSortOrder}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </Button>
+          </div>
+
+          <div className="text-sm text-muted-foreground">
+            Showing {jobsList.length} of {metrics?.total_jobs || 0} jobs
+          </div>
+        </div>
+
+        {/* Jobs List/Grid/Calendar/Map View */}
+        <div className="flex-1 overflow-hidden">
+          {error && (
+            <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="space-y-4 text-center">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-muted-foreground">Loading jobs...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {viewMode === 'list' && (
+                <VirtualizedJobList
+                  jobs={jobsArray}
+                  viewMode="compact"
+                  onJobClick={handleJobClick}
+                  onJobAction={handleJobAction}
+                  className="h-full"
+                />
+              )}
+
+              {viewMode === 'grid' && (
+                <VirtualizedJobList
+                  jobs={jobsArray}
+                  viewMode="detailed"
+                  onJobClick={handleJobClick}
+                  onJobAction={handleJobAction}
+                  className="h-full"
+                />
+              )}
+
+              {viewMode === 'calendar' && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <Calendar className="h-12 w-12 mx-auto text-muted-foreground" />
+                    <div>
+                      <h3 className="font-semibold">Calendar View</h3>
+                      <p className="text-muted-foreground">
+                        Calendar view will be implemented here
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {viewMode === 'map' && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <Map className="h-12 w-12 mx-auto text-muted-foreground" />
+                    <div>
+                      <h3 className="font-semibold">Map View</h3>
+                      <p className="text-muted-foreground">
+                        Map view will show job locations
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Quick Stats Footer */}
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600">
+                {metrics?.on_time_completion_rate || 0}%
+              </p>
+              <p className="text-xs text-muted-foreground">On-Time Completion</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-600">
+                {metrics?.average_completion_time || 0}h
+              </p>
+              <p className="text-xs text-muted-foreground">Avg Completion Time</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-purple-600">
+                ${metrics?.revenue_generated || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">Revenue This Month</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-600">
+                {metrics?.customer_satisfaction_score || 0}/5
+              </p>
+              <p className="text-xs text-muted-foreground">Customer Satisfaction</p>
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
-  )
+  );
 }

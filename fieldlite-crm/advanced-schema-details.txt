@@ -1,0 +1,182 @@
+================================================================================
+ADVANCED DATABASE SCHEMA EXTRACTION
+================================================================================
+Timestamp: 2025-09-30T01:38:00.565Z
+
+🔢 ENUM TYPES:
+--------------------------------------------------
+   public.payment_method: [card, ach, cash, check]
+   public.payment_method: (detected custom type)
+   public.contact_type: [lead, customer, vendor]
+   public.contact_type: (detected custom type)
+   public.call_direction: [inbound, outbound]
+   public.call_direction: (detected custom type)
+   public.call_status: [queued, ringing, in-progress, completed, busy, failed, no-answer, canceled]
+   public.call_status: (detected custom type)
+   public.job_status: [scheduled, in_progress, paused, complete, canceled]
+   public.job_status: (detected custom type)
+   public.job_priority: [low, medium, high, urgent]
+   public.job_priority: (detected custom type)
+   public.job_type: [installation, maintenance, repair, inspection, consultation, emergency, other]
+   public.job_type: (detected custom type)
+   public.payment_status: [pending, partial, paid, overdue]
+   public.payment_status: (detected custom type)
+   public.user_role: [owner, manager, estimator, tech, bookkeeper]
+   public.user_role: (detected custom type)
+   public.invoice_status: [draft, sent, partial, paid, overdue, void]
+   public.invoice_status: (detected custom type)
+   public.estimate_status: [draft, sent, accepted, declined, expired]
+   public.estimate_status: (detected custom type)
+   public.deal_stage: [new, qualified, estimating, quoted, won, lost]
+   public.deal_stage: (detected custom type)
+   public.message_channel: [sms, email]
+   public.message_channel: (detected custom type)
+
+📊 ENUM TYPES FOUND IN TABLE DEFINITIONS:
+   public.contact_type
+   public.call_direction
+   public.call_status
+   public.job_status
+   public.job_priority
+   public.job_type
+   public.payment_status
+   public.user_role
+   public.message_channel
+   public.invoice_status
+   public.estimate_status
+   public.deal_stage
+   public.payment_method
+
+⚙️ DATABASE FUNCTIONS AND PROCEDURES:
+--------------------------------------------------
+   Common CRM/Supabase functions that might exist:
+   - update_updated_at_column() (pattern detection)
+   - set_current_timestamp_updated_at() (pattern detection)
+   - generate_uuid_v4() (pattern detection)
+   - encrypt_twilio_credentials() (pattern detection)
+   - decrypt_twilio_credentials() (pattern detection)
+   - handle_new_user() (pattern detection)
+   - handle_tenant_setup() (pattern detection)
+
+   Checking for exposed RPC functions...
+   ❌ No RPC functions accessible or endpoint not available
+
+🔗 TABLE RELATIONSHIPS (Inferred):
+--------------------------------------------------
+   contacts.tenant_id -> tenants.id
+   contacts.company_id -> companies.id
+   contacts.owner_user_id -> profiles.id
+   contacts.created_by -> profiles.id
+   companies.tenant_id -> tenants.id
+   jobs.tenant_id -> tenants.id
+   jobs.deal_id -> deals.id
+   jobs.estimate_id -> estimates.id
+   jobs.customer_id -> contacts.id
+   jobs.crew_lead_id -> profiles.id
+   jobs.created_by -> profiles.id
+   jobs.invoice_id -> invoices.id
+   jobs.team_id -> profiles.id
+   calls.tenant_id -> tenants.id
+   calls.contact_id -> contacts.id
+   calls.user_id -> profiles.id
+   calls.deal_id -> deals.id
+   calls.job_id -> jobs.id
+   messages.tenant_id -> tenants.id
+   messages.user_id -> profiles.id
+   invoices.tenant_id -> tenants.id
+   invoices.job_id -> jobs.id
+   invoices.contact_id -> contacts.id
+   invoices.created_by -> profiles.id
+   payments.tenant_id -> tenants.id
+   payments.invoice_id -> invoices.id
+   payments.created_by -> profiles.id
+   estimates.tenant_id -> tenants.id
+   estimates.deal_id -> deals.id
+   estimates.created_by -> profiles.id
+   estimate_items.estimate_id -> estimates.id
+   estimate_items.catalog_item_id -> catalog_items.id
+   deals.tenant_id -> tenants.id
+   deals.contact_id -> contacts.id
+   deals.owner_user_id -> profiles.id
+   deals.created_by -> profiles.id
+   contact_activities.tenant_id -> tenants.id
+   contact_activities.contact_id -> contacts.id
+   contact_activities.created_by -> profiles.id
+   contact_notes.contact_id -> contacts.id
+   contact_notes.created_by -> profiles.id
+   call_notes.call_id -> calls.id
+   call_notes.created_by -> profiles.id
+   call_events.call_id -> calls.id
+   call_schedules.contact_id -> contacts.id
+   call_schedules.created_by -> profiles.id
+   call_schedules.tenant_id -> tenants.id
+   job_tasks.job_id -> jobs.id
+   job_tasks.assignee_user_id -> profiles.id
+   time_logs.tenant_id -> tenants.id
+   time_logs.job_id -> jobs.id
+   time_logs.user_id -> profiles.id
+   files.tenant_id -> tenants.id
+   files.owner_id -> profiles.id
+   audit_logs.tenant_id -> tenants.id
+   audit_logs.actor_user_id -> profiles.id
+   twilio_configurations.tenant_id -> tenants.id
+   catalog_items.tenant_id -> tenants.id
+   profiles.tenant_id -> tenants.id
+
+🔒 CONSTRAINTS AND INDEXES (Inferred):
+--------------------------------------------------
+   PRIMARY KEYS:
+      payments.id (UUID PRIMARY KEY)
+      contacts.id (UUID PRIMARY KEY)
+      catalog_items.id (UUID PRIMARY KEY)
+      calls.id (UUID PRIMARY KEY)
+      jobs.id (UUID PRIMARY KEY)
+      companies.id (UUID PRIMARY KEY)
+      profiles.id (UUID PRIMARY KEY)
+      call_events.id (UUID PRIMARY KEY)
+      products.id (UUID PRIMARY KEY)
+      time_logs.id (UUID PRIMARY KEY)
+      invoices.id (UUID PRIMARY KEY)
+      estimate_items.id (UUID PRIMARY KEY)
+      twilio_configurations.id (UUID PRIMARY KEY)
+      estimates.id (UUID PRIMARY KEY)
+      deals.id (UUID PRIMARY KEY)
+      files.id (UUID PRIMARY KEY)
+      messages.id (UUID PRIMARY KEY)
+      call_notes.id (UUID PRIMARY KEY)
+      job_tasks.id (UUID PRIMARY KEY)
+      contact_notes.id (UUID PRIMARY KEY)
+      tenants.id (UUID PRIMARY KEY)
+      contact_activities.id (UUID PRIMARY KEY)
+      call_schedules.id (UUID PRIMARY KEY)
+      audit_logs.id (UUID PRIMARY KEY)
+
+   UNIQUE CONSTRAINTS (Common patterns):
+      contacts.email (likely unique per tenant)
+      tenants.subdomain (unique)
+      twilio_configurations.phone_number (unique per tenant)
+      calls.twilio_call_sid (unique)
+      invoices.invoice_number (unique per tenant)
+      estimates.estimate_number (unique per tenant)
+      jobs.job_number (unique per tenant)
+      profiles.email (unique per tenant)
+
+   CHECK CONSTRAINTS (Inferred):
+      jobs.scheduled_start <= jobs.scheduled_end
+      invoices.amount_paid <= invoices.total_amount
+      deals.probability BETWEEN 0 AND 100
+      estimate_items.quantity > 0
+      time_logs.duration_minutes >= 0
+
+   INDEXES (Performance optimization patterns):
+      contacts(tenant_id, email)
+      contacts(tenant_id, phone)
+      calls(tenant_id, contact_id)
+      calls(twilio_call_sid)
+      jobs(tenant_id, status)
+      jobs(tenant_id, customer_id)
+      messages(tenant_id, thread_id)
+      invoices(tenant_id, status)
+      contact_activities(tenant_id, contact_id, activity_date)
+      audit_logs(tenant_id, created_at)
+      time_logs(tenant_id, job_id)

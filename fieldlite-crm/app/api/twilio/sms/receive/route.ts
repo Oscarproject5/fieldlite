@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import twilio from 'twilio';
+import { validateTwilioSignature, extractWebhookParams } from '@/lib/security/webhook-validator';
+import { rateLimit, RateLimitPresets, getRateLimitHeaders } from '@/lib/security/rate-limiter';
 
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
 /**
  * Webhook endpoint for receiving SMS messages
  * Twilio sends a POST request here when someone texts your number
+ *
+ * Security features:
+ * - Webhook signature validation to prevent forged requests
+ * - Rate limiting to prevent DoS attacks
+ * - Auto-reply control via database configuration
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +27,66 @@ export async function POST(request: NextRequest) {
     const messageBody = params.get('Body');
     const numMedia = params.get('NumMedia');
 
+    // Rate limit per phone number to prevent abuse
+    const rateLimitResult = await rateLimit(RateLimitPresets.SMS_RECEIVE(from || 'unknown'));
+    if (!rateLimitResult.success) {
+      console.warn('Rate limit exceeded for SMS from:', from);
+      const twiml = new MessagingResponse();
+      return new NextResponse(twiml.toString(), {
+        status: 429,
+        headers: {
+          'Content-Type': 'text/xml',
+          ...getRateLimitHeaders(rateLimitResult, 60)
+        }
+      });
+    }
+
+    const supabase = await createClient();
+
+    // Get Twilio auth token for signature validation
+    const { data: twilioConfig } = await supabase
+      .from('twilio_configurations')
+      .select('tenant_id, auth_token_encrypted, encryption_key_id')
+      .eq('phone_number', to)
+      .single();
+
+    if (!twilioConfig) {
+      console.error('No Twilio configuration found for number:', to);
+      const twiml = new MessagingResponse();
+      twiml.message('This number is not currently in service.');
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { 'Content-Type': 'text/xml' }
+      });
+    }
+
+    // Validate Twilio signature
+    const signature = request.headers.get('X-Twilio-Signature');
+    const url = request.url;
+
+    if (signature && twilioConfig.auth_token_encrypted) {
+      // Decrypt auth token for validation
+      const { data: decrypted } = await supabase.rpc('decrypt_secret', {
+        encrypted_data: twilioConfig.auth_token_encrypted,
+        key_id: twilioConfig.encryption_key_id
+      });
+
+      const webhookParams = extractWebhookParams(body);
+      const isValid = validateTwilioSignature(
+        signature,
+        url,
+        webhookParams,
+        decrypted
+      );
+
+      if (!isValid) {
+        console.error('Invalid Twilio signature for SMS webhook');
+        return new NextResponse('Unauthorized', { status: 401 });
+      }
+    } else {
+      console.warn('No signature validation performed - missing signature or auth token');
+    }
+
     console.log('SMS received:', {
       sid: messageSid,
       from,
@@ -27,15 +94,7 @@ export async function POST(request: NextRequest) {
       body: messageBody
     });
 
-    const supabase = await createClient();
-
-    // Find the tenant based on the Twilio phone number
-    const { data: twilioConfig } = await supabase
-      .from('twilio_configurations')
-      .select('tenant_id')
-      .eq('phone_number', to)
-      .single();
-
+    // twilioConfig already fetched above for signature validation
     if (twilioConfig) {
       // Find or create contact based on phone number
       const { data: contact } = await supabase
@@ -66,36 +125,38 @@ export async function POST(request: NextRequest) {
         console.error('Failed to save SMS:', insertError);
       }
 
-      // Auto-reply options (customize as needed)
+      // Check tenant settings for auto-reply configuration
+      const { data: tenantSettings } = await supabase
+        .from('tenant_settings')
+        .select('sms_auto_reply_enabled, sms_auto_reply_message, sms_keyword_responses')
+        .eq('tenant_id', twilioConfig.tenant_id)
+        .single();
+
       const twiml = new MessagingResponse();
 
-      // Example auto-replies based on keywords
-      const lowerBody = messageBody?.toLowerCase() || '';
+      // Handle auto-replies if enabled
+      if (tenantSettings?.sms_auto_reply_enabled) {
+        const lowerBody = messageBody?.toLowerCase() || '';
 
-      if (lowerBody.includes('hours') || lowerBody.includes('open')) {
-        twiml.message('We are open Monday-Friday 9AM-5PM. How can we help you?');
-      } else if (lowerBody.includes('stop')) {
-        // Handle opt-out
-        twiml.message('You have been unsubscribed. Reply START to resubscribe.');
-      } else if (lowerBody.includes('help')) {
-        twiml.message('Reply HOURS for business hours, CONTACT for contact info, or call us at (833) 949-0539');
-      } else {
-        // Default auto-reply
-        twiml.message('Thanks for your message! We\'ll get back to you shortly. For immediate assistance, call (833) 949-0539');
+        // Check for keyword-based responses first
+        const keywordResponses = tenantSettings.sms_keyword_responses || {};
+        let replied = false;
+
+        for (const [keyword, response] of Object.entries(keywordResponses)) {
+          if (lowerBody.includes(keyword.toLowerCase())) {
+            twiml.message(response as string);
+            replied = true;
+            break;
+          }
+        }
+
+        // If no keyword matched, send default auto-reply
+        if (!replied && tenantSettings.sms_auto_reply_message) {
+          twiml.message(tenantSettings.sms_auto_reply_message);
+        }
       }
 
       // Return TwiML response
-      return new NextResponse(twiml.toString(), {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/xml'
-        }
-      });
-    } else {
-      // No tenant found, send generic response
-      const twiml = new MessagingResponse();
-      twiml.message('This number is not currently in service.');
-
       return new NextResponse(twiml.toString(), {
         status: 200,
         headers: {
